@@ -34,6 +34,7 @@ async function run() {
     const usersProfile = client.db('DoctorInfo').collection('users');
     const doctorService = client.db('DoctorInfo').collection('doctor');
     const bookinsProfile = client.db('DoctorInfo').collection('books');
+    const inFoProfile = client.db('DoctorInfo').collection('info');
 
     // jwt releted api
     app.post('/jwt', async (req, res) => {
@@ -45,7 +46,7 @@ async function run() {
 
     // middlewares
     const verifyToken = (req, res, next) => {
-      console.log('inside the token', req.headers.authorization);
+
       if (!req.headers.authorization) {
         return res.status(401).send({ message: 'forbidden access' })
       }
@@ -56,16 +57,16 @@ async function run() {
         }
         req.decoded = decoded;
         next();
-      })    
+      })
     }
 
-    const veryfiedAdmin = async(req,res,next) => {
+    const veryfiedAdmin = async (req, res, next) => {
       const email = req.decoded.email;
-      const query = {email: email};
+      const query = { email: email };
       const user = await usersProfile.findOne(query);
       const isAdmin = user?.role === 'admin';
-      if(!isAdmin){
-        return res.status(403).send({message: 'forbidden access'})
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' })
       }
       next();
     }
@@ -75,7 +76,8 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/users/admin/:email', verifyToken,veryfiedAdmin, async (req, res) => {
+
+    app.get('/users/admin/:email', verifyToken, veryfiedAdmin, async (req, res) => {
       const email = req.params.email;
       if (email !== req.decoded.email) {
         return res.status(403).send({ message: 'unauthorized access' })
@@ -89,7 +91,7 @@ async function run() {
       res.send({ admin });
     })
 
-    app.post('/users', verifyToken, veryfiedAdmin, async (req, res) => {
+    app.post('/users',  async (req, res) => {
       const user = req.body;
       const query = { email: user?.email }
       const existingUser = await usersProfile.findOne(query);
@@ -100,14 +102,14 @@ async function run() {
       res.send(result);
     })
 
-    app.delete('/users/:id',verifyToken, veryfiedAdmin, async (req, res) => {
+    app.delete('/users/:id', verifyToken, veryfiedAdmin, async (req, res) => {
       const user = req.params.id;
       const query = { _id: new ObjectId(user) }
       const result = await usersProfile.deleteOne(query);
       res.send(result)
     })
 
-    app.patch('/users/admin/:id',verifyToken,veryfiedAdmin, async (req, res) => {
+    app.patch('/users/admin/:id', verifyToken, veryfiedAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -132,11 +134,50 @@ async function run() {
       const query = { _id: new ObjectId(user) }
       const result = await doctorService.findOne(query);
       res.send(result);
+    })
+    app.patch('/doctor/:id', async (req, res) => {
+      const item = req.body;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          name: item.name,
+          email: item.email,
+          money: item.money,
+          specialty: item.specialty,
+          image: item.image
+        }
+      }
+      const result = await doctorService.updateOne(query, updateDoc);
+      res.send(result)
 
     })
-    
+
+    app.delete('/doctor/:id', verifyToken, veryfiedAdmin, async (req, res) => {
+      const user = req.params.id;
+      const query = { _id: new ObjectId(user) };
+      const result = await doctorService.deleteOne(query);
+      res.send(result)
+    })
+
 
     // appointment releted api
+    app.get('/books', async (req, res) => {
+      const email = req.query.email; // Get email from query parameters
+    
+      if (!email) {
+        return res.status(400).send({ error: "Email query parameter is required" });
+      }
+    
+      const result = await bookinsProfile.find({ email: email }).toArray(); // Filter by email
+    
+      if (result.length === 0) {
+        return res.status(404).send({ message: "No data found for the specified email" });
+      }
+    
+      res.send(result);
+    });
+    
     app.post('/books', async (req, res) => {
       const user = req.body;
       const result = await bookinsProfile.insertOne(user);
@@ -146,20 +187,33 @@ async function run() {
     // manage 
     app.get('/menage', verifyToken, veryfiedAdmin, async (req, res) => {
       try {
-          const cursor = await doctorService.find().toArray(); // Retrieve all doctor data
-          res.send(cursor); // Send the data back to the client
+        const cursor = await doctorService.find().toArray(); // Retrieve all doctor data
+        res.send(cursor); // Send the data back to the client
       } catch (error) {
-          console.error('Error fetching doctors:', error);
-          res.status(500).send({ error: 'Failed to fetch doctor data' });
+        console.error('Error fetching doctors:', error);
+        res.status(500).send({ error: 'Failed to fetch doctor data' });
       }
-  });
-  
-  
-    app.post('/manage',verifyToken, veryfiedAdmin, async(req,res) => {
+    });
+
+
+    app.post('/manage', verifyToken, veryfiedAdmin, async (req, res) => {
       const item = req.body;
       const result = await doctorService.insertOne(item)
       res.send(result);
     })
+
+    // info
+    app.get('/info', async (req, res) => {
+      try {
+        const result = await inFoProfile.find().toArray();
+        res.status(200).send(result);
+      } catch (error) {
+        console.error('Error fetching information:', error);
+        res.status(500).send({ message: 'Failed to retrieve data.' });
+      }
+    });
+
+
 
 
 
